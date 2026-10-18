@@ -1,0 +1,36 @@
+{
+  "name": "sfx",
+  "version": "0.1.0",
+  "description": "Simple fx — minimal agent harness compiled to a native ELF via scriptc",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "sfx": "./dist/native/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs && bash test/elf.test.sh",
+    "gate": "bash scripts/scriptc-gate.sh",
+    "elf": "node_modules/.bin/scriptc build src/native/cli.ts -o dist/sfx",
+    "lint": "oxlint src/",
+    "fmt": "oxfmt --check src/ test/"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "oxfmt": "^0.17.0",
+    "oxlint": "^1.9.0",
+    "scriptc": "^0.3.4",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "author": "Joaquin Terrasa & contributors",
+  "keywords": [
+    "agent",
+    "cli",
+    "scriptc",
+    "elf"
+  ]
+}

@@ -1,0 +1,5 @@
+allowBuilds:
+  scriptc: true
+minimumReleaseAgeExclude:
+  - scriptc
+  - '@scriptc/*'
