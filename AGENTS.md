@@ -48,6 +48,14 @@ Unix-scrollback output, `ask --json`, sessions under `~/.sfx`.
 - `as unknown as` is SC1090 — single-level casts only.
 - Avoid literal `undefined` as a value; read missing object fields into a
   const and check `=== null`/`=== undefined` as comparisons only.
+- `as` casts on `JSON.parse` output run a real shape check at ELF runtime:
+  a `T | null` field REJECTS an absent key (`got undefined`). Wire models
+  use `field?: T | null` for anything the peer may omit.
+- `IncomingMessage` chunks stay `Buffer` — `setEncoding("utf8")` and
+  `buf.toString` are no-ops/not-implemented. Decode with
+  `new TextDecoder().decode(chunk)` (proven in @cutils drivers).
+- `catch {` (optional catch binding) lowers fine; prefer it when the error
+  object is unused.
 
 ## Conventions
 
