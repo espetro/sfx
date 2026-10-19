@@ -12,6 +12,10 @@ interface PayloadRow {
   payload: string;
 }
 
+interface SessionRow {
+  session: string;
+}
+
 export class SqliteSessionStore implements SessionStore {
   db: Database;
   root: string;
@@ -39,6 +43,17 @@ export class SqliteSessionStore implements SessionStore {
     ins.finalize();
   }
 
+  async save(id: string, messages: ChatMessage[]): Promise<void> {
+    const del = this.db.prepareRaw("DELETE FROM messages WHERE session=?");
+    del.runRaw([id]);
+    del.finalize();
+    for (let i = 0; i < messages.length; i++) {
+      const ins = this.db.prepareRaw("INSERT INTO messages (session, payload) VALUES (?, ?)");
+      ins.runRaw([id, JSON.stringify(messages[i])]);
+      ins.finalize();
+    }
+  }
+
   async load(id: string): Promise<ChatMessage[]> {
     const sel = this.db.prepareRaw("SELECT payload FROM messages WHERE session=? ORDER BY rowid");
     const rows = sel.all([id]);
@@ -47,6 +62,20 @@ export class SqliteSessionStore implements SessionStore {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i] as PayloadRow;
       out.push(JSON.parse(row.payload) as ChatMessage);
+    }
+    return out;
+  }
+
+  async list(): Promise<string[]> {
+    const sel = this.db.prepareRaw(
+      "SELECT session FROM messages GROUP BY session ORDER BY MAX(rowid) DESC",
+    );
+    const rows = sel.all([]);
+    sel.finalize();
+    const out: string[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i] as SessionRow;
+      out.push(row.session);
     }
     return out;
   }
