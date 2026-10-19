@@ -1,0 +1,93 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            toolchain: scriptc
+            asset: sfx-linux-x86_64
+          - os: macos-14
+            toolchain: bun
+            asset: sfx-darwin-arm64
+          - os: windows-latest
+            toolchain: bun
+            asset: sfx-windows-x86_64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: oven-sh/setup-bun@v2
+        if: matrix.toolchain == 'bun'
+
+      - run: pnpm install --frozen-lockfile
+
+      # Linux: real scriptc ELF — native sqlite store included.
+      - name: scriptc build (linux)
+        if: matrix.toolchain == 'scriptc'
+        run: pnpm elf
+
+      # macOS/Windows: bun standalone binary over the same sources.
+      # The sqlite session store degrades to a clear error there
+      # (shim_* globals only exist inside a scriptc --ffi build).
+      - name: bun build (macos/windows)
+        if: matrix.toolchain == 'bun'
+        run: bun build --compile src/native/cli.ts --outfile dist/sfx
+
+      - name: stage asset
+        shell: bash
+        run: |
+          mkdir -p out
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp dist/sfx.exe "out/${{ matrix.asset }}"
+          else
+            cp dist/sfx "out/${{ matrix.asset }}"
+          fi
+
+      - name: smoke --version
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            ./dist/sfx.exe --version
+          else
+            ./dist/sfx --version
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: out/
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-assets
+      - name: collect
+        run: |
+          mkdir -p release
+          find dist-assets -type f -exec cp {} release/ \;
+          ls -la release
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true

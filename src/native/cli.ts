@@ -71,6 +71,10 @@ function parseArgs(args: string[]): CliArgs {
     } else if (a === "--store") {
       i++;
       out.store = i < args.length ? args[i] : null;
+    } else if (a === "--help" || a === "-h") {
+      out.command = "help";
+    } else if (a === "--version" || a === "-v") {
+      out.command = "version";
     } else if (out.command === "" && !a.startsWith("--")) {
       out.command = a;
     } else {
@@ -94,11 +98,11 @@ const DEFAULT_SYSTEM =
 
 async function main(): Promise<number> {
   const args = parseArgs(process.argv.slice(2));
-  if (args.command === "--help" || args.command === "-h" || args.command === "help") {
+  if (args.command === "help") {
     console.log(HELP);
     return 0;
   }
-  if (args.command === "--version" || args.command === "-v" || args.command === "version") {
+  if (args.command === "version") {
     console.log(VERSION);
     return 0;
   }
@@ -144,7 +148,16 @@ async function main(): Promise<number> {
     if (!(await hosts.fs.exists(home + "/.sfx"))) {
       await hosts.fs.mkdir(home + "/.sfx");
     }
-    store = new SqliteSessionStore(Database.open(home + "/.sfx/sessions.db"), home + "/.sfx");
+    let db: Database;
+    try {
+      db = Database.open(home + "/.sfx/sessions.db");
+    } catch {
+      // Bun-compiled builds have no sqlite shim: shim_* globals only
+      // exist inside scriptc ELFs linked with --ffi.
+      console.error("error: --store sqlite is only available in the native (scriptc) build");
+      return 2;
+    }
+    store = new SqliteSessionStore(db, home + "/.sfx");
   } else {
     store = new JsonlSessionStore(hosts.fs, home + "/.sfx");
   }
