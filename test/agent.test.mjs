@@ -57,8 +57,11 @@ test("agent loop: tool call then final text over stub SSE", async () => {
         tools,
         maxSteps: 4,
         streamText: true,
+        compactTokens: 0,
+        compactKeep: 8,
       },
       "run a command",
+      [],
       (c) => chunks.push(c),
     );
     assert.equal(result.toolCalls, 1);
@@ -70,6 +73,51 @@ test("agent loop: tool call then final text over stub SSE", async () => {
     const toolMsg = result.messages.find((m) => m.role === "tool");
     assert.ok(toolMsg);
     assert.ok(toolMsg.content.includes("hello-from-tool"));
+
+    // --resume: replay the session's messages as `prior`; the stub replies
+    // "resumed ok" only when the request body carries the prior tool result.
+    const resumed = await runAgent(
+      hosts,
+      {
+        provider,
+        model: "stub-model",
+        system: "test",
+        tools,
+        maxSteps: 4,
+        streamText: true,
+        compactTokens: 0,
+        compactKeep: 8,
+      },
+      "continue",
+      result.messages.slice(),
+      () => {},
+    );
+    assert.equal(resumed.text, "resumed ok");
+    // prior history is preserved; only one new user + assistant message added
+    assert.equal(resumed.messages.length, result.messages.length + 2);
+    assert.equal(resumed.messages[0].role, "system");
+
+    // --compact: tiny threshold forces a summary call; the stub answers
+    // "compact summary" for it, then the request continues on the
+    // compacted transcript (tool pair cut away at the boundary).
+    const compacted = await runAgent(
+      hosts,
+      {
+        provider,
+        model: "stub-model",
+        system: "test",
+        tools,
+        maxSteps: 4,
+        streamText: false,
+        compactTokens: 1,
+        compactKeep: 3,
+      },
+      "continue",
+      result.messages.slice(),
+      () => {},
+    );
+    assert.equal(compacted.text, "resumed ok");
+    assert.ok(compacted.messages.some((m) => m.content?.includes("[conversation summary]")));
   } finally {
     srv.kill();
   }

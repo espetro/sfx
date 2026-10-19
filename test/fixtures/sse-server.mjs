@@ -22,7 +22,39 @@ const server = http.createServer((req, res) => {
         "cache-control": "no-cache",
         connection: "keep-alive",
       });
-      if (hits === 1) {
+      let users = 0;
+      try {
+        const parsed = JSON.parse(body);
+        for (const m of parsed.messages || []) {
+          if (m.role === "user") users++;
+        }
+      } catch {}
+      if (body.includes("Summarize this conversation")) {
+        // Compaction path: the agent asked for a summary of prior history.
+        sse(res, {
+          choices: [
+            {
+              index: 0,
+              delta: { role: "assistant", content: "compact summary" },
+              finish_reason: "stop",
+            },
+          ],
+          usage: { prompt_tokens: 9, completion_tokens: 3 },
+        });
+      } else if (users >= 2) {
+        // --resume: a request carrying 2+ user turns is a replayed session;
+        // a same-run tool round-trip still has only one user message.
+        sse(res, {
+          choices: [
+            {
+              index: 0,
+              delta: { role: "assistant", content: "resumed ok" },
+              finish_reason: "stop",
+            },
+          ],
+          usage: { prompt_tokens: 31, completion_tokens: 4 },
+        });
+      } else if (hits === 1) {
         sse(res, {
           choices: [
             {
