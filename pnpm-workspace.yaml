@@ -1,5 +1,9 @@
+packages:
+  - .
 allowBuilds:
   scriptc: true
 minimumReleaseAgeExclude:
   - scriptc
   - '@scriptc/*'
+  - '@chttp/*'
+  - '@cutils/*'

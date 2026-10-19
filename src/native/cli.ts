@@ -1,11 +1,16 @@
 // sfx — simple fx. `sfx ask` one-shot agent call; sessions under ~/.sfx.
 // Scriptc entry point: `scriptc build src/native/cli.ts`.
 
+/// <reference path="../../shims.d.ts" />
+
+import { Database } from "@cutils/sqlite/elf";
 import { homedir } from "node:os";
 import { nativeHosts } from "./host.ts";
 import { OpenAIProvider } from "../core/provider/openai.ts";
 import { defaultTools } from "../core/tools.ts";
 import { JsonlSessionStore } from "../core/session.ts";
+import type { SessionStore } from "../core/session.ts";
+import { SqliteSessionStore } from "./sqlite-session.ts";
 import { runAgent } from "../core/agent.ts";
 import type { Hosts } from "../core/ports.ts";
 
@@ -17,11 +22,12 @@ const HELP =
   " — simple fx agent harness\n" +
   "\n" +
   "usage:\n" +
-  "  sfx ask [--json] [--model M] [--base-url U] [--max-steps N] [--system S] [prompt...]\n" +
+  "  sfx ask [--json] [--model M] [--base-url U] [--max-steps N] [--system S] [--store jsonl|sqlite] [prompt...]\n" +
   "  sfx --help\n" +
   "\n" +
   "prompt reads from argv, else stdin. env: SFX_BASE_URL (or OPENAI_BASE_URL),\n" +
-  "SFX_API_KEY (or OPENAI_API_KEY), SFX_MODEL (or OPENAI_MODEL).\n";
+  "SFX_API_KEY (or OPENAI_API_KEY), SFX_MODEL (or OPENAI_MODEL),\n" +
+  "SFX_STORE (jsonl default; sqlite keeps ~/.sfx/sessions.db).\n";
 
 interface CliArgs {
   command: string;
@@ -30,6 +36,7 @@ interface CliArgs {
   baseUrl: string | null;
   maxSteps: number;
   system: string | null;
+  store: string | null;
   prompt: string[];
 }
 
@@ -41,6 +48,7 @@ function parseArgs(args: string[]): CliArgs {
     baseUrl: null,
     maxSteps: 16,
     system: null,
+    store: null,
     prompt: [],
   };
   let i = 0;
@@ -60,6 +68,9 @@ function parseArgs(args: string[]): CliArgs {
     } else if (a === "--system") {
       i++;
       out.system = i < args.length ? args[i] : null;
+    } else if (a === "--store") {
+      i++;
+      out.store = i < args.length ? args[i] : null;
     } else if (out.command === "" && !a.startsWith("--")) {
       out.command = a;
     } else {
@@ -127,7 +138,16 @@ async function main(): Promise<number> {
   const tools = defaultTools();
   const homeRaw = envOr(hosts, "SFX_HOME", "HOME");
   const home = homeRaw !== null ? homeRaw : homedir();
-  const store = new JsonlSessionStore(hosts.fs, home + "/.sfx");
+  const storeKind = args.store !== null ? args.store : envOr(hosts, "SFX_STORE", "SFX_STORE");
+  let store: SessionStore;
+  if (storeKind !== null && storeKind === "sqlite") {
+    if (!(await hosts.fs.exists(home + "/.sfx"))) {
+      await hosts.fs.mkdir(home + "/.sfx");
+    }
+    store = new SqliteSessionStore(Database.open(home + "/.sfx/sessions.db"), home + "/.sfx");
+  } else {
+    store = new JsonlSessionStore(hosts.fs, home + "/.sfx");
+  }
   const sessionId = store.newId();
 
   const system = args.system !== null ? args.system : DEFAULT_SYSTEM;

@@ -7,6 +7,16 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@chttp/router':
+        specifier: ^0.4.0
+        version: 0.4.0
+      '@chttp/val':
+        specifier: ^0.4.0
+        version: 0.4.0
+      '@cutils/sqlite':
+        specifier: ^0.4.0
+        version: 0.4.0
     devDependencies:
       '@types/node':
         specifier: ^24.0.0
@@ -25,6 +35,23 @@ importers:
         version: 5.9.3
 
 packages:
+
+  '@chttp/router@0.4.0':
+    resolution: {integrity: sha512-FLWi/UMZ55n6+awF/sIyPNoGsq+qVXr8cZNI3v7ChYi1NtRllhOsjdOEYaLAqTmMPzrwtTOmOVw6fCBH9OyEaw==}
+    engines: {node: '>=22'}
+
+  '@chttp/val@0.4.0':
+    resolution: {integrity: sha512-jYwcb2ckSDtv+LjTJ7Hque+o7FsDWedmC30wp4+GYXv4phvmpO3Y22EHpcIYWn/sC8E/6/Uw+mzhksw8qFqDYg==}
+    engines: {node: '>=22'}
+
+  '@cutils/sqlite@0.4.0':
+    resolution: {integrity: sha512-NjNGOXbj5VJmhGjHkzZCiCqZwIW0w51CpT/22qzPy5Uz721wPmkNDe0oJhynL56fW1eSB3r++lQwoG6xOcw62w==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      koffi: ^2.14.1
+    peerDependenciesMeta:
+      koffi:
+        optional: true
 
   '@oxfmt/darwin-arm64@0.17.0':
     resolution: {integrity: sha512-OMv0tOb+xiwSZKjYbM6TwMSP5QwFJlBGQmEsk98QJ30sHhdyC//0UvGKuR0KZuzZW4E0+k0rHDmos1Z5DmBEkA==}
@@ -266,6 +293,12 @@ packages:
     resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
 
 snapshots:
+
+  '@chttp/router@0.4.0': {}
+
+  '@chttp/val@0.4.0': {}
+
+  '@cutils/sqlite@0.4.0': {}
 
   '@oxfmt/darwin-arm64@0.17.0':
     optional: true
