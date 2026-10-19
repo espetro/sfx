@@ -1,6 +1,10 @@
 // Built-in tools: bash, read_file, write_file, edit_file. grep/glob come
 // free through bash on native; a browser-mode bash is a JS worker sandbox.
+// Arg validation: @chttp/val — each tool's `parametersJson` is derived from
+// its schema (toJsonSchema), and run() rejects bad args through safeParse.
 
+import { object, safeParse, string, summarize, toJsonSchema } from "@chttp/val";
+import type { VSchema } from "@chttp/val";
 import type { ExecOptions, Hosts } from "./ports.ts";
 import type { Tool, ToolSpec } from "./messages.ts";
 
@@ -15,129 +19,157 @@ function cap(text: string): string {
   );
 }
 
-function strField(args: unknown, key: string): string {
-  const rec = args as Record<string, unknown>;
-  const v = rec[key];
-  if (typeof v === "string") {
-    return v;
-  }
-  return "";
+interface BashArgs {
+  command: string;
+}
+
+interface PathArgs {
+  path: string;
+}
+
+interface WriteArgs {
+  path: string;
+  content: string;
+}
+
+interface EditArgs {
+  path: string;
+  old: string;
+  new: string;
 }
 
 export class BashTool implements Tool {
+  schema: VSchema = object({ command: string() });
+
   spec(): ToolSpec {
     return {
       name: "bash",
       description: "Run a shell command and return combined output",
-      parametersJson:
-        '{"type":"object","properties":{"command":{"type":"string"}},"required":["command"],"additionalProperties":false}',
+      parametersJson: JSON.stringify(toJsonSchema(this.schema)),
     };
   }
 
   async run(args: unknown, hosts: Hosts): Promise<string> {
-    const command = strField(args, "command");
-    if (command === "") {
+    const r = safeParse(this.schema, args);
+    if (!r.success) {
+      return "error: invalid args: " + summarize(r.issues === null ? [] : r.issues);
+    }
+    const a = r.output as BashArgs;
+    if (a.command === "") {
       return "error: missing command";
     }
     const opts: ExecOptions = { cwd: null, timeoutMs: 120000 };
     // scriptc refuses `exec`/`shell:true`; the shell binary is the escape hatch.
-    const r = await hosts.exec.exec(["/bin/sh", "-c", command], opts);
-    let out = r.stdout;
-    if (r.stderr !== "") {
-      out = out + (out === "" ? "" : "\n") + r.stderr;
+    const res = await hosts.exec.exec(["/bin/sh", "-c", a.command], opts);
+    let out = res.stdout;
+    if (res.stderr !== "") {
+      out = out + (out === "" ? "" : "\n") + res.stderr;
     }
-    if (r.code !== 0) {
-      out = out + "\n[exit " + r.code + "]";
+    if (res.code !== 0) {
+      out = out + "\n[exit " + res.code + "]";
     }
     return cap(out);
   }
 }
 
 export class ReadFileTool implements Tool {
+  schema: VSchema = object({ path: string() });
+
   spec(): ToolSpec {
     return {
       name: "read_file",
       description: "Read a text file and return its contents",
-      parametersJson:
-        '{"type":"object","properties":{"path":{"type":"string"}},"required":["path"],"additionalProperties":false}',
+      parametersJson: JSON.stringify(toJsonSchema(this.schema)),
     };
   }
 
   async run(args: unknown, hosts: Hosts): Promise<string> {
-    const path = strField(args, "path");
-    if (path === "") {
+    const r = safeParse(this.schema, args);
+    if (!r.success) {
+      return "error: invalid args: " + summarize(r.issues === null ? [] : r.issues);
+    }
+    const a = r.output as PathArgs;
+    if (a.path === "") {
       return "error: missing path";
     }
     try {
-      const content = await hosts.fs.readFile(path);
+      const content = await hosts.fs.readFile(a.path);
       return cap(content);
     } catch {
-      return "error: cannot read " + path;
+      return "error: cannot read " + a.path;
     }
   }
 }
 
 export class WriteFileTool implements Tool {
+  schema: VSchema = object({ path: string(), content: string() });
+
   spec(): ToolSpec {
     return {
       name: "write_file",
       description: "Write a text file, replacing any existing content",
-      parametersJson:
-        '{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"],"additionalProperties":false}',
+      parametersJson: JSON.stringify(toJsonSchema(this.schema)),
     };
   }
 
   async run(args: unknown, hosts: Hosts): Promise<string> {
-    const path = strField(args, "path");
-    if (path === "") {
+    const r = safeParse(this.schema, args);
+    if (!r.success) {
+      return "error: invalid args: " + summarize(r.issues === null ? [] : r.issues);
+    }
+    const a = r.output as WriteArgs;
+    if (a.path === "") {
       return "error: missing path";
     }
     try {
-      await hosts.fs.writeFile(path, strField(args, "content"));
-      return "wrote " + path;
+      await hosts.fs.writeFile(a.path, a.content);
+      return "wrote " + a.path;
     } catch {
-      return "error: cannot write " + path;
+      return "error: cannot write " + a.path;
     }
   }
 }
 
 export class EditFileTool implements Tool {
+  schema: VSchema = object({ path: string(), old: string(), new: string() });
+
   spec(): ToolSpec {
     return {
       name: "edit_file",
       description: "Replace an exact string in a file; fails unless it appears exactly once",
-      parametersJson:
-        '{"type":"object","properties":{"path":{"type":"string"},"old":{"type":"string"},"new":{"type":"string"}},"required":["path","old","new"],"additionalProperties":false}',
+      parametersJson: JSON.stringify(toJsonSchema(this.schema)),
     };
   }
 
   async run(args: unknown, hosts: Hosts): Promise<string> {
-    const path = strField(args, "path");
-    const oldStr = strField(args, "old");
-    const newStr = strField(args, "new");
-    if (path === "" || oldStr === "") {
+    const r = safeParse(this.schema, args);
+    if (!r.success) {
+      return "error: invalid args: " + summarize(r.issues === null ? [] : r.issues);
+    }
+    const a = r.output as EditArgs;
+    if (a.path === "" || a.old === "") {
       return "error: missing path or old";
     }
     let content = "";
     try {
-      content = await hosts.fs.readFile(path);
+      content = await hosts.fs.readFile(a.path);
     } catch {
-      return "error: cannot read " + path;
+      return "error: cannot read " + a.path;
     }
-    const first = content.indexOf(oldStr);
+    const first = content.indexOf(a.old);
     if (first < 0) {
-      return "error: old string not found in " + path;
+      return "error: old string not found in " + a.path;
     }
-    const second = content.indexOf(oldStr, first + oldStr.length);
+    const second = content.indexOf(a.old, first + a.old.length);
     if (second >= 0) {
-      return "error: old string is not unique in " + path;
+      return "error: old string is not unique in " + a.path;
     }
-    const next = content.slice(0, first) + newStr + content.slice(first + oldStr.length);
+    const next = content.slice(0, first) + a.new + content.slice(first + a.old.length);
     try {
-      await hosts.fs.writeFile(path, next);
-      return "edited " + path;
+      await hosts.fs.writeFile(a.path, next);
+      return "edited " + a.path;
     } catch {
-      return "error: cannot write " + path;
+      return "error: cannot write " + a.path;
     }
   }
 }

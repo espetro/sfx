@@ -3,3 +3,5 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - scriptc
   - '@scriptc/*'
+  - '@chttp/*'
+  - '@cutils/*'

@@ -57,9 +57,29 @@ Unix-scrollback output, `ask --json`, sessions under `~/.sfx`.
 - `catch {` (optional catch binding) lowers fine; prefer it when the error
   object is unused.
 
+## Adopted packages
+
+- `@chttp/val` — tool-arg validation: each Tool holds a `VSchema`;
+  `spec().parametersJson` derives via `toJsonSchema`, `run()` gates on
+  `safeParse`. Pure TS — browser-safe too.
+- `@cutils/sqlite` — `SqliteSessionStore` behind the SessionStore port
+  (`sfx ask --store sqlite`; JSONL stays default). ELF-only lane: the npm
+  tarball ships the static `.a` + ffi manifest, not the koffi `.so`, so
+  plain-Node tests can't exercise it — verify through `test/elf.test.sh`.
+  Consumer recipe: `import { Database } from "@cutils/sqlite/elf"`, a
+  committed root `shims.d.ts` referenced via `/// <reference>` from cli.ts
+  AND gate.ts (scriptc needs the ambient declares inside the program), and
+  `scriptc build ... --npm-static @cutils/sqlite --ffi
+  node_modules/@cutils/sqlite/ffi.json`.
+- `@chttp/router`, `@chttp/mcp` — installed for `sfx serve` / MCP client
+  (PRs 9–10); `@chttp/mcp@0.4.0` not on npm yet (0.2.0 lacks `./client`).
+
 ## Conventions
 
 - Any behavior change ships with a `node --test` and an ELF-lane assertion.
-- `scriptc coverage gate.ts` at 100% is required to merge.
+- `scriptc coverage gate.ts` must report zero blockers; sites "deferred to
+  runtime" are reported but allowed (they throw only if executed — e.g.
+  sqlite's Object.keys record-bind path we never reach; binds stay
+  positional arrays).
 - Provider tests always use `test/fixtures/sse-server.mjs`, never live APIs.
 - Commits: conventional, atomic.
